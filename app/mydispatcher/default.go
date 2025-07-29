@@ -385,11 +385,29 @@ func sniffer(ctx context.Context, cReader *cachedReader, metadataOnly bool, netw
 func (d *DefaultDispatcher) routedDispatch(ctx context.Context, link *transport.Link, destination net.Destination) {
 	outbounds := session.OutboundsFromContext(ctx)
 	ob := outbounds[len(outbounds)-1]
-	if hosts, ok := d.dns.(dns.HostsLookup); ok && destination.Address.Family().IsDomain() {
-		proxied := hosts.LookupHosts(ob.Target.String())
-		if proxied != nil {
+	// if hosts, ok := d.dns.(dns.HostsLookup); ok && destination.Address.Family().IsDomain() {
+	// 	proxied := hosts.LookupHosts(ob.Target.String())
+	// 	if proxied != nil {
+	// 		ro := ob.RouteTarget == destination
+	// 		destination.Address = *proxied
+	// 		if ro {
+	// 			ob.RouteTarget = destination
+	// 		} else {
+	// 			ob.Target = destination
+	// 		}
+	// 	}
+	// }
+
+	if destination.Address.Family().IsDomain() {
+		// 使用 LookupIP 方法查询域名，接收三个返回值
+		ips, _, err := d.dns.LookupIP(ob.Target.String(), dns.IPOption{
+			IPv4Enable: true,
+			IPv6Enable: true,
+		})
+		if err == nil && len(ips) > 0 {
 			ro := ob.RouteTarget == destination
-			destination.Address = *proxied
+			// 取第一个 IP 地址作为目标地址
+			destination.Address = net.IPAddress(ips[0])
 			if ro {
 				ob.RouteTarget = destination
 			} else {
